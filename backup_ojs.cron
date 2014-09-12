@@ -1,0 +1,77 @@
+#!/bin/sh
+## OJS Daily backup. 1 week retention.
+
+PKPDIR=/srv/ojs                                 # location of OJS
+BACKUPDIR=/var/local/backups/ojs                # backup destination
+OWNER=root:wheel                                # unix owner and group of the backups. owner can write, group can read.
+
+#You should not have to change anything below this line
+
+CAT=/bin/cat
+CHMOD=/bin/chmod
+CHOWN=/bin/chown
+CUT=/bin/cut
+GREP=/bin/grep
+GZIP=/bin/gzip
+MKDIR=/bin/mkdir
+TAR=/bin/tar
+MYSQLDUMP=/usr/bin/mysqldump
+XARGS=/usr/bin/xargs
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='/usr/bin/sudo'
+fi
+
+## Read useful values out of the config file
+
+PKPCFG=$PKPDIR/config.inc.php                   # OJS Config File
+PKPDB=`$SUDO $CAT $PKPCFG | $SUDO $GREP ^name | $SUDO $CUT -d "=" -f 2 | $SUDO $XARGS`
+PKPUSER=`$SUDO $CAT $PKPCFG | $SUDO $GREP ^username | $SUDO $CUT -d "=" -f 2 | $SUDO $XARGS`
+PKPPASS=`$SUDO $CAT $PKPCFG | $SUDO $GREP ^password | $SUDO $CUT -d "=" -f 2 | $SUDO $XARGS`
+PKPFILES=`$SUDO $CAT $PKPCFG | $SUDO $GREP ^files_dir | $SUDO $CUT -d "=" -f 2 | $SUDO $XARGS`
+
+## We definitely want a file backup the OJS directory.
+## If files_dir is outside the main ojs directory, we'll add that to the backup as well.
+DIRECTORIES=$PKPDIR
+if [[ $PKPFILES != $PKPDIR/* ]]; then
+        DIRECTORIES="$DIRECTORIES $PKPFILES"
+fi
+
+PATH=/usr/local/bin:/usr/bin:/bin
+TIMEDIR=$BACKUPDIR/last-full                    # where to store time of full backup
+DOW=`date +%a`                                  # Day of the week e.g. Mon
+DOM=`date +%d`                                  # Date of the Month e.g. 27
+DM=`date +%d%b`                                 # Date and Month e.g. 27Sep
+
+# Make destination dirs if they don't exist
+$SUDO $MKDIR -p $BACKUPDIR;
+$SUDO $MKDIR -p $TIMEDIR;
+
+# Daily DB dump
+$SUDO $MYSQLDUMP -u $PKPUSER -p$PKPPASS -B $PKPDB | $SUDO $GZIP -9 > $BACKUPDIR/$HOSTNAME-$DOW.sql.gz
+
+# Weekly full backup
+if [ $DOW = "Sun" ]; then
+        NEWER=""
+        NOW=`date +%d-%b`
+
+        # Update full backup date
+        $SUDO echo $NOW > $TIMEDIR/$HOSTNAME-full-date
+        $SUDO $TAR $NEWER -czf $BACKUPDIR/$HOSTNAME-$DOW.tar.gz $DIRECTORIES
+
+# Make incremental backup - overwrite last weeks
+else
+
+        # Get date of last full backup
+        NEWER="--newer `$SUDO cat $TIMEDIR/$HOSTNAME-full-date`"
+        $SUDO $TAR $NEWER -czf $BACKUPDIR/$HOSTNAME-$DOW.tar.gz $DIRECTORIES
+fi
+
+# Set permissions for backups to root-writeable and wheel readable
+$SUDO $CHOWN -R $OWNER $BACKUPDIR
+$SUDO $CHOWN -R $OWNER $TIMEDIR
+$SUDO $CHMOD 750 $BACKUPDIR
+$SUDO $CHMOD 750 $TIMEDIR
+$SUDO $CHMOD 650 $BACKUPDIR/$HOSTNAME-$DOW.tar.gz
+$SUDO $CHMOD 650 $BACKUPDIR/$HOSTNAME-$DOW.sql.gz
+$SUDO $CHMOD 650 $TIMEDIR/$HOSTNAME-full-date
