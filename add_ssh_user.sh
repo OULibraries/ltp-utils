@@ -20,6 +20,8 @@ else
   $SUDO useradd -G $GROUP $USER
 fi
 
+PSSWD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 12 | head -n 1)
+
 $SUDO mkdir /home/$USER/.ssh
 
 echo "Enter the comment for the public key provided by the user:"
@@ -37,4 +39,7 @@ $SUDO echo -e "ssh-rsa $PUBKEY" >> /home/$USER/.ssh/authorized_keys
 $SUDO echo "---- END SSH2 PUBLIC KEY ----" >> /home/$USER/.ssh/authorized_keys
 $SUDO chown -R $USER:$USER /home/$USER/.ssh
 $SUDO chmod -R 700 /home/$USER/.ssh
-$SUDO echo -e "$USER\n" | $SUDO passwd $USER --stdin
+
+$SUDO echo -e "$PSSWD\n" | $SUDO passwd $USER --stdin
+echo "$USER's Password is:"
+echo "$PSSWD"
