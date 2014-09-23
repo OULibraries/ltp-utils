@@ -63,7 +63,7 @@ if [ $DOW = "Sun" ]; then
 else
 
         # Get date of last full backup
-        NEWER="--newer `$SUDO cat $TIMEDIR/$HOSTNAME-full-date`"
+        NEWER="--newer `$SUDO $CAT $TIMEDIR/$HOSTNAME-full-date`"
         $SUDO $TAR $NEWER -czf $BACKUPDIR/$HOSTNAME-$DOW.tar.gz $DIRECTORIES
 fi
 
