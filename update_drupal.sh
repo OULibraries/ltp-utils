@@ -1,12 +1,26 @@
 #!/bin/bash
+## Searches for any Drupal installs in /srv,
+## updates them, resets ownership, then restarts apache.
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='/usr/bin/sudo'
+fi
+CHOWN=/bin/chown
+CP=/bin/cp
+DRUSH=/usr/bin/drush
+SERVICE=/sbin/service
+
 cd /
-/usr/bin/sudo find -path "./srv/*/drupal/sites/*/settings.php" | while read -r SITE ; do
+$SUDO find -path "./srv/*/drupal/sites/*/settings.php" | while read -r SITE ; do
   PATH=`echo $SITE | /bin/sed -e "s,^.\(.*/drupal\)\(.*\),\1,g"`
-  /usr/bin/sudo /bin/cp $PATH/.htaccess /tmp/
-  /usr/bin/sudo /usr/bin/drush up -y --security-only -r $PATH
-  /usr/bin/sudo /bin/cp /tmp/.htaccess $PATH/
-  /usr/bin/sudo /bin/rm /tmp/.htaccess
+  printf "Checking $PATH\n"
+  $SUDO $CP $PATH/.htaccess /tmp/
+  $SUDO $DRUSH rf -r $PATH
+  $SUDO $DRUSH up -y --security-only -r $PATH
+  $SUDO $CP /tmp/.htaccess $PATH/
+  $SUDO /bin/rm /tmp/.htaccess
+  printf "\n\n"
 done
 
-/usr/bin/sudo /bin/chown -R apache:apache /srv
-/usr/bin/sudo /sbin/service httpd restart
+$SUDO $CHOWN -R apache:apache /srv
+$SUDO $SERVICE httpd restart
