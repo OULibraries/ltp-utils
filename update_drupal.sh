@@ -8,6 +8,7 @@ fi
 CHOWN=/bin/chown
 CP=/bin/cp
 DRUSH=/usr/bin/drush
+RM=/bin/rm
 SERVICE=/sbin/service
 
 cd /
@@ -18,7 +19,7 @@ $SUDO find -path "./srv/*/drupal/sites/*/settings.php" | while read -r SITE ; do
   $SUDO $DRUSH rf -r $PATH
   $SUDO $DRUSH up -y --security-only -r $PATH
   $SUDO $CP /tmp/.htaccess $PATH/
-  $SUDO /bin/rm /tmp/.htaccess
+  $SUDO $RM /tmp/.htaccess
   printf "\n\n"
 done
 
