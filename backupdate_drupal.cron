@@ -1,0 +1,96 @@
+#!/bin/bash
+## Drupal Daily backup + update. 1 week retention.
+
+## Searches for any Drupal installs in /srv,
+## backs them up, updates them,
+## resets ownership, then restarts apache.
+
+BACKUPDIR=/var/local/backups/drupal             # backup destination
+BACKUPOWNER=root:wheel                          # unix owner and group of the backups. owner can write, group can read.
+SITESOWNER=apache:apache                        # unix owner and group of /srv.
+
+## Don't edit below here.
+CAT=/bin/cat
+CHMOD=/bin/chmod
+CHOWN=/bin/chown
+CP=/bin/cp
+CUT=/bin/cut
+DRUSH=/usr/bin/drush
+GREP=/bin/grep
+GZIP=/bin/gzip
+MKDIR=/bin/mkdir
+TAR=/bin/tar
+PATH=/usr/local/bin:/usr/bin:/bin
+PRINTF=/usr/bin/printf
+RM=/bin/rm
+SERVICE=/sbin/service
+XARGS=/usr/bin/xargs
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='/usr/bin/sudo'
+fi
+
+
+cd /
+printf "Searching for Drupal sites.\n"
+
+$SUDO find -path "./srv/*/drupal/sites/*/settings.php" | while read -r SITE ; do
+  SITEPATH=`echo $SITE | /bin/sed -e "s,^.\(.*/drupal\)\(.*\),\1,g"`
+  printf "Backing up $SITEPATH\n"
+
+  DBNAME=`$SUDO $DRUSH status --fields=db-name -r $SITEPATH | $SUDO $CUT -d ":" -f 2 | $SUDO $XARGS`
+  printf "\t$DBNAME\n"
+  SITEBACKUPDIR=$BACKUPDIR/$DBNAME
+  TIMEDIR=$SITEBACKUPDIR/last-full                    # where to store time of full backup
+  DOW=`date +%a`                                  # Day of the week e.g. Mon
+  DOM=`date +%d`                                  # Date of the Month e.g. 27
+  DM=`date +%d%b`                                 # Date and Month e.g. 27Sep
+
+  # Make destination dirs if they don't exist
+  $SUDO $MKDIR -p $SITEBACKUPDIR;
+  $SUDO $MKDIR -p $TIMEDIR;
+
+  # Daily DB dump
+  $SUDO $DRUSH sql-dump -r $SITEPATH | $SUDO $GZIP -9 > $SITEBACKUPDIR/$HOSTNAME-$DOW.sql.gz
+
+  # Weekly full backup
+  if [ $DOW = "Tue" ]; then
+        NEWER=""
+        NOW=`date +%d-%b`
+
+        # Update full backup date
+        $SUDO echo $NOW > $TIMEDIR/$HOSTNAME-full-date
+        $SUDO $TAR $NEWER -czf $SITEBACKUPDIR/$HOSTNAME-$DOW.tar.gz $SITEPATH
+
+  # Make incremental backup - overwrite last weeks
+  else
+
+        # Get date of last full backup
+        NEWER="--newer `$SUDO $CAT $TIMEDIR/$HOSTNAME-full-date`"
+        $SUDO $TAR $NEWER -czf $SITEBACKUPDIR/$HOSTNAME-$DOW.tar.gz $SITEPATH
+  fi
+
+  # Set permissions for backups to root-writeable and wheel readable
+  printf "Setting permissions for $SITEBACKUPDIR\n"
+  $SUDO $CHOWN -R $BACKUPOWNER $BACKUPDIR
+  $SUDO $CHOWN -R $BACKUPOWNER $TIMEDIR
+  $SUDO $CHMOD 750 $BACKUPDIR
+  $SUDO $CHMOD 750 $SITEBACKUPDIR
+  $SUDO $CHMOD 750 $TIMEDIR
+  $SUDO $CHMOD 650 $SITEBACKUPDIR/$HOSTNAME-$DOW.tar.gz
+  $SUDO $CHMOD 650 $SITEBACKUPDIR/$HOSTNAME-$DOW.sql.gz
+  $SUDO $CHMOD 650 $TIMEDIR/$HOSTNAME-full-date
+
+  printf "Updating $SITEPATH\n"
+  $SUDO $CP $SITEPATH/.htaccess /tmp/
+  $SUDO $DRUSH rf -r $SITEPATH
+  $SUDO $DRUSH up -y --security-only -r $SITEPATH
+  $SUDO $CP /tmp/.htaccess $SITEPATH/
+  $SUDO $RM /tmp/.htaccess
+  printf "\n\n"
+done
+
+printf "Setting /srv permissions and restarting apache.\n"
+$SUDO $CHOWN -R $SITESOWNER /srv
+$SUDO $SERVICE httpd restart
+printf "Done.\n"
