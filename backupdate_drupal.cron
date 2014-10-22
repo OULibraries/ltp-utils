@@ -54,7 +54,7 @@ $SUDO find -path "./srv/*/drupal/sites/*/settings.php" | while read -r SITE ; do
   $SUDO $DRUSH sql-dump -r $SITEPATH | $SUDO $GZIP -9 > $SITEBACKUPDIR/$HOSTNAME-$DOW.sql.gz
 
   # Weekly full backup
-  if [ $DOW = "Tue" ]; then
+  if [ $DOW = "Sun" ]; then
         NEWER=""
         NOW=`date +%d-%b`
 
