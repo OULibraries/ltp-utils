@@ -33,7 +33,7 @@ rsync -av /Users/$TEMPLATE_SOURCE/* /System/Library/User\ Template/English.lproj
 chown -R root:wheel /System/Library/User\ Template/English.lproj/
 
 ## Remove Keychain
-rm -rf  /System/Library/User\ Templates/English.lproj/Library/Keychains/*
+rm -rf  /System/Library/User\ Template/English.lproj/Library/Keychains/*
 
 ## Repair permissions
 diskutil repairPermissions /
