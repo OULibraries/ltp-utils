@@ -26,6 +26,9 @@ cp -r /System/Library/User\ Template/English.lproj /System/Library/User\ Templat
 ## Remove old default profile
 rm -rf /System/Library/User\ Template/English.lproj/*
 
+## Sleep to allow user to quit terminal
+sleep 5
+
 ## Add custom profile from user
 rsync -av /Users/$TEMPLATE_SOURCE/* /System/Library/User\ Template/English.lproj/
 
