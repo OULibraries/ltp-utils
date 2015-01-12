@@ -6,9 +6,9 @@ if (( $EUID != 0 )); then
     SUDO='/usr/bin/sudo'
 fi
 CHOWN=/bin/chown
+CHMOD=/bin/chmod
 CP=/bin/cp
 DRUSH=/usr/bin/drush
-RM=/bin/rm
 SERVICE=/sbin/service
 
 cd /
@@ -19,7 +19,8 @@ $SUDO find -path "./srv/*/drupal/sites/*/settings.php" | while read -r SITE ; do
   $SUDO $DRUSH rf -r $PATH
   $SUDO $DRUSH up -y --security-only -r $PATH
   $SUDO $CP /tmp/.htaccess $PATH/
-  $SUDO $RM /tmp/.htaccess
+  $SUDO /bin/rm /tmp/.htaccess
+  $SUDO $CHMOD -R 775 $PATH
   printf "\n\n"
 done
 
