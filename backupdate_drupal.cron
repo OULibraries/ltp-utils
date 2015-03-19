@@ -72,6 +72,8 @@ $SUDO find -L -wholename "./*/drupal/sites/*/settings.php" 2>/dev/null | while r
   $SUDO cp $SITEPATH/.htaccess /tmp/
   $SUDO drush rf -r $SITEPATH
   $SUDO drush up -y --security-only -r $SITEPATH
+  # Don't talk to yourself, Drupal -- kthx logan
+  $SUDO drush eval  'variable_set('drupal_http_request_fails', 0)'
   $SUDO cp /tmp/.htaccess $SITEPATH/
   $SUDO rm /tmp/.htaccess
   printf "\n\n"
