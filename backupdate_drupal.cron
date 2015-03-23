@@ -20,19 +20,22 @@ fi
 cd /srv
 printf "Searching for Drupal sites.\n"
 $SUDO find -L -wholename "./*/drupal/sites/*/settings.php" 2>/dev/null | while read -r SITE ; do
+#$SUDO find -path "./srv/*/drupal/sites/*/settings.php" | while read -r SITE ; do
   SITEPATH=`echo $SITE | /bin/sed -e "s,^.\(.*/drupal\)\(.*\),\/srv\1,g"`
   printf "Backing up $SITEPATH\n"
 
   DBNAME=`$SUDO drush status --fields=db-name -r $SITEPATH | $SUDO cut -d ":" -f 2 | $SUDO xargs`
   printf "\t$DBNAME\n"
   SITEBACKUPDIR=$BACKUPDIR/$DBNAME
-  TIMEDIR=$SITEBACKUPDIR/last-full                    # where to store time of full backup
+  TEMPDIR=$BACKUPDIR/temp                         # Temp space for operators
+  TIMEDIR=$SITEBACKUPDIR/last-full                # where to store time of full backup
   DOW=`date +%a`                                  # Day of the week e.g. Mon
   DOM=`date +%d`                                  # Date of the Month e.g. 27
   DM=`date +%d%b`                                 # Date and Month e.g. 27Sep
 
   # Make destination dirs if they don't exist
   $SUDO mkdir -p $SITEBACKUPDIR;
+  $SUDO mkdir -p $TEMPDIR;
   $SUDO mkdir -p $TIMEDIR;
 
   # Daily DB dump
@@ -68,12 +71,13 @@ $SUDO find -L -wholename "./*/drupal/sites/*/settings.php" 2>/dev/null | while r
   $SUDO chmod 650 $SITEBACKUPDIR/$HOSTNAME-$DOW.sql.gz
   $SUDO chmod 650 $TIMEDIR/$HOSTNAME-full-date
 
+  # Wheel can write to temp space
+  $SUDO chmod 770 $TEMPDIR
+
   printf "Updating $SITEPATH\n"
   $SUDO cp $SITEPATH/.htaccess /tmp/
   $SUDO drush rf -r $SITEPATH
   $SUDO drush up -y --security-only -r $SITEPATH
-  # Don't talk to yourself, Drupal -- kthx logan
-  $SUDO drush eval  'variable_set('drupal_http_request_fails', 0)'
   $SUDO cp /tmp/.htaccess $SITEPATH/
   $SUDO rm /tmp/.htaccess
   printf "\n\n"
