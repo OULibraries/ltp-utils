@@ -37,6 +37,10 @@ $SUDO find -L -wholename "./*/drupal/sites/*/settings.php" 2>/dev/null | while r
   $SUDO mkdir -p $SITEBACKUPDIR;
   $SUDO mkdir -p $TEMPDIR;
   $SUDO mkdir -p $TIMEDIR;
+  
+  ## Set Drupal perms - allows group write
+  $SUDO find $SITEPATH -type d -exec chmod u=rwx,g=rwx,o= '{}' \;
+  $SUDO find $SITEPATH -type f -exec chmod u=rw,g=rw,o= '{}' \;
 
   # Daily DB dump
   $SUDO drush sql-dump -r $SITEPATH | $SUDO gzip -9 > $SITEBACKUPDIR/$HOSTNAME-$DOW.sql.gz
