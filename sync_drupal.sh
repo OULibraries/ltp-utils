@@ -1,5 +1,6 @@
 #!/bin/sh
 ## Sync Drupal files & DB from source host
+PATH=/usr/local/bin:/usr/bin:/bin:/sbin
 
 # Owner and group for site path
 SITESOWNER=apache:apache
@@ -7,14 +8,7 @@ SITESOWNER=apache:apache
 # Writable dir on both local and souce hosts
 TEMPDIR=/var/local/backups/drupal/temp
 
-# Set path and sudo string
-PATH=/usr/local/bin:/usr/bin:/bin:/sbin
-SUDO=''
-if (( $EUID != 0 )); then
-    SUDO='sudo'
-fi
-
-## Require argument
+## Require arguments
 if [ ! -z "$1" ] && [ ! -z "$2" ]
 then
   SITEPATH=$1
@@ -25,19 +19,36 @@ else
   exit 1;
 fi
 
+## Set sudo if user isn't root
+SUDO=''
+if (( $EUID != 0 )); then
+    SUDO='sudo'
+fi
+
 ## Grab the basename of the site to use in a few places.
 SITE=`basename $SITEPATH`
 
-#from target
-rsync -a --ignore-times $SRCHOST:$SITEPATH/default/files $SITEPATH/default/
-#copy db
+## Sync Files
+rsync -a --ignore-times --omit-dir-times --no-perms $SRCHOST:$SITEPATH/default/files $SITEPATH/default/ || exit 1;
+echo "Files synced."
+
+## Perform sql-dump on source host
 ssh -A $SRCHOST drush -r $SITEPATH/drupal sql-dump --result-file=$TEMPDIR/drupal_$SITE.sql
-rsync $SRCHOST:$TEMPDIR/drupal_$SITE.sql $TEMPDIR/
-sudo drush sql-cli -r $SITEPATH/drupal < $TEMPDIR/drupal_$SITE.sql || exit 1;
-echo "Database synced"
+
+## Sync sql-dump
+rsync --omit-dir-times $SRCHOST:$TEMPDIR/drupal_$SITE.sql $TEMPDIR/
+
+## Load sql-dump to local DB
+drush sql-cli -r $SITEPATH/drupal < $TEMPDIR/drupal_$SITE.sql || exit 1;
+
+## Cleanup sql-dumps
+ssh -A $SRCHOST rm $TEMPDIR/drupal_$SITE.sql
+rm $TEMPDIR/drupal_$SITE.sql
+echo "Database synced."
 
 ## Set perms of default site dir
 $SUDO chcon -R -t  httpd_sys_content_t $SITEPATH/default
 $SUDO chown -R $SITESOWNER $SITEPATH/default
-$SUDO find $SITEPATH/default -type d -exec chmod u=rwx,g=rx,o= '{}' \;
-$SUDO find $SITEPATH/default -type f -exec chmod u=rw,g=r,o= '{}' \;
+$SUDO find $SITEPATH/default -type d -exec chmod u=rwx,g=rwx,o= '{}' \;
+$SUDO find $SITEPATH/default -type f -exec chmod u=rw,g=rw,o= '{}' \;
+$SUDO chmod 444 $SITEPATH/default/settings.php
