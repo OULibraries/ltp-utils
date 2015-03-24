@@ -30,6 +30,7 @@ if [[ -e $SITEPATH ]]; then
     echo "$SITEPATH already exists!"
     exit 1
 fi
+
 ## Make the parent directory
 $SUDO mkdir -p $SITEPATH
 $SUDO chown $SITESOWNER $SITEPATH
@@ -82,6 +83,7 @@ EOF
 cp $SITEPATH/default/default.settings.php $SITEPATH/default/settings.php
 echo "$SETTINGSPHP" >> $SITEPATH/default/settings.php
 $SUDO chmod 444 $SITEPATH/default/settings.php
+
 # Set owner
 echo "Changing owner."
 $SUDO chown -R $SITESOWNER $SITEPATH
