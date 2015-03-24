@@ -59,8 +59,8 @@ mv $SITEPATH/drupal/sites/default $SITEPATH/
 ## operations aren't duplicating efforts.
 echo "Linking default site into build."
 ln -s $SITEPATH/default $SITEPATH/drupal/sites/default
-#$SUDO chown $SITESOWNER $SITEPATH/drupal/sites/default
 
+echo "Generating settings.php."
 read -d '' SETTINGSPHP <<- EOF
 \$databases = array (
   'default' =>
@@ -81,7 +81,7 @@ EOF
 
 cp $SITEPATH/default/default.settings.php $SITEPATH/default/settings.php
 echo "$SETTINGSPHP" >> $SITEPATH/default/settings.php
-
+$SUDO chmod 444 $SITEPATH/default/settings.php
 # Set owner
 echo "Changing owner."
 $SUDO chown -R $SITESOWNER $SITEPATH
