@@ -1,9 +1,10 @@
 #!/bin/sh
-## Build from drush make
+## Bootstrap an empty drupal site
+PATH=/usr/local/bin:/usr/bin:/bin:/sbin
 
 SITESOWNER=apache:apache                        # unix owner and group of /srv.
-## Don't edit below here.
-## Requires argument
+
+## Require arguments
 if [ ! -z "$1" ]
 then
   SITEPATH=$1
@@ -13,23 +14,28 @@ else
   exit 1;
 fi
 
-# root DB password
-echo -n Root DB Password:
-read -s ROOTDBPSSWD
-echo
-
-# Generate Drupal DB password
-DBPSSWD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 12 | head -n 1)
-PATH=/usr/local/bin:/usr/bin:/bin:/sbin
+## Set sudo if user isn't root
 SUDO=''
 if (( $EUID != 0 )); then
     SUDO='sudo'
 fi
 
+## Don't blow away existing sites
 if [[ -e $SITEPATH ]]; then
     echo "$SITEPATH already exists!"
     exit 1
 fi
+
+# Get root DB password
+read -s -p "Enter MYSQL root password: " ROOTDBPSSWD
+echo
+
+while ! mysql -u root -p$ROOTDBPSSWD  -e ";" ; do
+    read -s -p "Can't connect, please retry: " ROOTDBPSSWD
+done
+
+# Generate Drupal DB password
+DBPSSWD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 12 | head -n 1)
 
 ## Make the parent directory
 $SUDO mkdir -p $SITEPATH
@@ -95,6 +101,8 @@ drush -y sql-create --db-su=root --db-su-pw=$ROOTDBPSSWD -r $SITEPATH/drupal || 
 drush -y -r $SITEPATH/drupal site-install --site-name=$SITE || exit 1;
 
 ## Make the apache config
-$SUDO sed "s/__SITE_DIR__/$SITE/g" /etc/httpd/conf.d/template_init_oulib_drupal > /etc/httpd/conf.d/srv_$SITE.conf
+echo "Generating Apache Config."
+#$SUDO rm /etc/httpd/conf.d/srv_$SITE.conf
+$SUDO sh -c " sed "s/__SITE_DIR__/$SITE/g" /etc/httpd/conf.d/template_init_oulib_drupal > /etc/httpd/conf.d/srv_$SITE.conf" || exit 1;
 $SUDO service httpd configtest || exit 1;
 $SUDO service httpd reload || exit 1;
