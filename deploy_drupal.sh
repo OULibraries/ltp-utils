@@ -62,7 +62,7 @@ $SUDO chown -R $SITESOWNER $SITEPATH/default
 ## Link default site folder. Doing this last ensures that our earlier recursive
 ## operations aren't duplicating efforts.
 echo "Linking default site into new build."
-ln -s /srv/lib/default $SITEPATH/drupal_build/sites/default
+ln -s $SITEPATH/default $SITEPATH/drupal_build/sites/default
 $SUDO chown $SITESOWNER $SITEPATH/drupal_build/sites/default
 
 ## Now that everything is ready, do the swap
