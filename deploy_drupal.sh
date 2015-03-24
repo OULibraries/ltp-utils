@@ -1,7 +1,10 @@
 #!/bin/sh
 ## Deploy drupal site from drush make
+PATH=/usr/local/bin:/usr/bin:/bin:/sbin
 
-SITESOWNER=apache:apache                        # unix owner and group of site path.
+## Unix owner and group of site path
+SITESOWNER=apache:apache
+
 ## Don't edit below here.
 # Require arguments
 if [ ! -z "$1" ] && [ ! -z "$2" ]
@@ -14,36 +17,62 @@ else
   exit 1;
 fi
 
-PATH=/usr/local/bin:/usr/bin:/bin:/sbin
 SUDO=''
 if (( $EUID != 0 )); then
-    SUDO='/usr/bin/sudo'
+    SUDO='sudo'
 fi
 
-## Build from drush make
-$SUDO drush make $MAKEFILE $SITEPATH/drupal_build || exit 1;
+## Delete build dir if it's there
+rm -rf $SITEPATH/drupal_build
+
+## Build from drush make or die
+drush -y --working-copy make $MAKEFILE $SITEPATH/drupal_build || exit 1;
 
 ## Delete default site in the build
-$SUDO rm -rf $SITEPATH/drupal_build/sites/default
+rm -rf $SITEPATH/drupal_build/sites/default
 
-## Link default site folder
-$SUDO chcon -R -t  httpd_sys_content_t $SITEPATH/default
-$SUDO chown -R $SITESOWNER $SITEPATH/default
-$SUDO ln -s /srv/lib/default $SITEPATH/drupal_build/sites/default
+## Set perms- allows group write
+echo "Setting permissions of the new build."
+$SUDO find $SITEPATH/drupal_build -type d -exec chmod u=rwx,g=rwx,o= '{}' \;
+$SUDO find $SITEPATH/drupal_build -type f -exec chmod u=rw,g=rw,o= '{}' \;
 
-## Set perms of build dir
-$SUDO chcon -R -t  httpd_sys_content_t $SITEPATH/drupal_build
+# Set SELinux or die
+echo "Setting SELinux policy of the new build."
+$SUDO semanage fcontext -a -t httpd_sys_content_t  "$SITEPATH/drupal_build(/.*)?" || exit 1;
+$SUDO restorecon -R $SITEPATH/drupal_build || exit 1;
+
+# Set owner
+echo "Changing owner of the new build."
 $SUDO chown -R $SITESOWNER $SITEPATH/drupal_build
-$SUDO find $SITEPATH/drupal_build -type d -exec chmod u=rwx,g=rx,o= '{}' \;
-$SUDO find $SITEPATH/drupal_build -type f -exec chmod u=rw,g=r,o= '{}' \;
+
+## Set perms- allows group write
+echo "Setting permissions of default site."
+$SUDO find $SITEPATH/default -type d -exec chmod u=rwx,g=rwx,o= '{}' \;
+$SUDO find $SITEPATH/default -type f -exec chmod u=rw,g=rw,o= '{}' \;
+
+# Set SELinux or die
+echo "Setting SELinux policy of the default site."
+$SUDO semanage fcontext -a -t httpd_sys_content_t  "$SITEPATH/default(/.*)?" || exit 1;
+$SUDO restorecon -R $SITEPATH/default || exit 1;
+
+# Set owner
+echo "Changing owner of the default site."
+$SUDO chown -R $SITESOWNER $SITEPATH/default
+
+## Link default site folder. Doing this last ensures that our earlier recursive
+## operations aren't duplicating efforts.
+echo "Linking default site into new build."
+ln -s /srv/lib/default $SITEPATH/drupal_build/sites/default
+$SUDO chown $SITESOWNER $SITEPATH/drupal_build/sites/default
 
 ## Now that everything is ready, do the swap
+echo "Placing new build."
 $SUDO rm -rf $SITEPATH/drupal_bak
-$SUDO mv $SITEPATH/drupal $SITEPATH/drupal_bak
-$SUDO mv $SITEPATH/drupal_build $SITEPATH/drupal
+mv $SITEPATH/drupal $SITEPATH/drupal_bak
+mv $SITEPATH/drupal_build $SITEPATH/drupal
 
 ## Clear the caches
-$SUDO drush cc all -r $SITEPATH/drupal || exit 1;
+drush -y cc all -r $SITEPATH/drupal || exit 1;
 
-## Don't talk to yourself, Drupal -- kthx logan
-$SUDO drush eval  'variable_set('drupal_http_request_fails', 0)' -r $SITEPATH/drupal || exit 1;
+## Avoid a known performance-crusher in our environment
+drush eval 'variable_set('drupal_http_request_fails', 0)' -r $SITEPATH/drupal || exit 1;
