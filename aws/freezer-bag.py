@@ -123,6 +123,13 @@ hashes = Table('freezerbag_hashes')
 names = Table('freezerbag_names')
 jobs = Table('freezerbag_jobs')
 
+## Set up translation table for character replacement in the date and filenames
+## The things we do for unicode support in python2. ARGHH!
+#datetranstable = str.maketrans('', '', '-')
+#filetranstable = str.maketrans('\\', '/')
+datetranstable = dict.fromkeys(map(ord, u'-'), None)
+filetranstable = dict.fromkeys(map(ord, u'\\'), u'/')
+
 
 class GlacierVault:
     """
@@ -277,6 +284,7 @@ class GlacierVault:
         """
         Initiate a Job, check its status, and download the archive when it's completed.
         """
+        filename = os.path.normpath(filename.translate(filetranstable))
         bag_date = str(bag_date)
         #archive_id = self.get_archive_id(filename, bag_date)
         destdir = os.path.normpath(os.path.abspath(os.path.join(bagparent, bag_date)))
@@ -388,9 +396,6 @@ if args.freeze:
             print("Bag is valid!")
     else:
         sys.exit("Bag \"%s\" is invalid!" % fulbagpath)
-
-    ## Set up translation table for character replacement in the date
-    datetranstable = str.maketrans("", "", "-")
 
     ## As of version 2.2, the LC Bagger program changed bagging-* to packing-* so we need to check for both
     if 'Bagging-Date' in bag.info:
