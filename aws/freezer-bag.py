@@ -37,7 +37,7 @@ DynamoDB and Glacier.
     see:
     https://docs.aws.amazon.com/IAM/latest/UserGuide/PoliciesOverview.html
 
-Below is an example policy:
+Below is an examply DB policy:
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -58,18 +58,24 @@ Below is an example policy:
                 "dynamodb:UpdateTable"
             ],
             "Resource": [
-                "arn:aws:dynamodb:us-east-1:*:table/freezerbag_*"
+                "arn:aws:dynamodb:us-east-1:*:table/freezerbag_*",
+                "arn:aws:dynamodb:us-west-1:*:table/freezerbag_*",
+                "arn:aws:dynamodb:us-west-2:*:table/freezerbag_*"
             ]
         }
-    ],
+    ]
+}
+
+Below is an example vaults policy:
+{
+    "Version": "2012-10-17",
     "Statement": [
         {
             "Effect": "Allow",
             "Resource": [
-                "arn:aws:glacier:us-east-1:*:vaults/*",
-                "arn:aws:glacier:us-east-2:*:vaults/*",
-                "arn:aws:glacier:us-west-1:*:vaults/*",
-                "arn:aws:glacier:us-west-2:*:vaults/*"
+                "arn:aws:glacier:us-east-1:*:vaults/freezerbag_*",
+                "arn:aws:glacier:us-west-1:*:vaults/freezerbag_*",
+                "arn:aws:glacier:us-west-2:*:vaults/freezerbag_*"
             ],
             "Action": [
                 "glacier:DescribeVault",
@@ -81,6 +87,7 @@ Below is an example policy:
                 "glacier:ListParts",
                 "glacier:InitiateJob",
                 "glacier:ListJobs",
+                "glacier:DescribeJob",
                 "glacier:GetJobOutput",
                 "glacier:ListMultipartUploads",
                 "glacier:CompleteMultipartUpload"
@@ -90,7 +97,6 @@ Below is an example policy:
             "Effect": "Allow",
             "Resource": [
                 "arn:aws:glacier:us-east-1:*",
-                "arn:aws:glacier:us-east-2:*",
                 "arn:aws:glacier:us-west-1:*",
                 "arn:aws:glacier:us-west-2:*"
             ],
@@ -180,15 +186,12 @@ class GlacierVault:
                 print(e.status)
                 print(e.message)
                 exit()
-        ## Now try to write again, and die if it fails.  This is ugly, and should be done in a try loop or something.        
-        try:
-            hashes.put_item(data={
-                'file_hash': file_hash,
-                'archive_id': archive_id,
-                'vault_name': vault_name,
-            })
-        except:
-            raise
+        ## Write out the hash too
+        hashes.put_item(data={
+            'file_hash': file_hash,
+            'archive_id': archive_id,
+            'vault_name': vault_name,
+        })
         try:
             names.put_item(data={
                 'filename': rel_filename,
