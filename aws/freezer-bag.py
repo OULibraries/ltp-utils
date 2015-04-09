@@ -123,12 +123,8 @@ hashes = Table('freezerbag_hashes')
 names = Table('freezerbag_names')
 jobs = Table('freezerbag_jobs')
 
-## Set up translation table for character replacement in the date and filenames
-## The things we do for unicode support in python2. ARGHH!
-#datetranstable = str.maketrans('', '', '-')
-#filetranstable = str.maketrans('\\', '/')
-datetranstable = dict.fromkeys(map(ord, u'-'), None)
-filetranstable = dict.fromkeys(map(ord, u'\\'), u'/')
+## Set up translation table for character replacement in filenames
+filetranstable = dict.fromkeys(map(ord, '\\'), u'/')
 
 
 class GlacierVault:
@@ -153,13 +149,17 @@ class GlacierVault:
                                     
         self.vault = layer2.get_vault(vault_name)
 
+        ## Bodge to fix Boto unicode bug
+        ## see https://github.com/boto/boto/issues/2603
+        self.vault.name = str(self.vault.name)
 
     def upload(self, filename, file_hash):
         """
         Upload filename and store the archive id for future retrieval
         """
+        
         rel_filename = os.path.relpath(filename, bagparent)
-        archive_id = self.vault.upload_archive(filename, description=rel_filename)
+        archive_id = self.vault.concurrent_create_archive_from_file(filename, description=rel_filename)
         
         # Storing the archive_id, filename, file_hash, and bag_date relationships in dynamodb
         try:
@@ -169,23 +169,22 @@ class GlacierVault:
                 'file_hash': file_hash,
                 'filename': rel_filename,
             })
-        ## If the database doesn't exist, create it            
+        ## If the database doesn't exist, create it then add the entry
         except JSONResponseError as e:
             if e.status == 400 and e.message == 'Requested resource not found':
                 print('freezerbag_archives table missing, creating now')
                 Table.create('freezerbag_archives', schema=[HashKey('archive_id'), RangeKey('vault_name', data_type='S')])
                 time.sleep(30)
+                hashes.put_item(data={
+                    'file_hash': file_hash,
+                    'archive_id': archive_id,
+                    'vault_name': vault_name,
+                })
             ## Bail if we hit a JSON error we don't understand
             else:
                 print(e.status)
                 print(e.message)
-                exit()
-        hashes.put_item(data={
-            'file_hash': file_hash,
-            'archive_id': archive_id,
-            'vault_name': vault_name,
-        })
-        
+                exit()        
         try:
             names.put_item(data={
                 'filename': rel_filename,
@@ -198,6 +197,7 @@ class GlacierVault:
         ## If the database doesn't exist, create it            
         except JSONResponseError as e:
             if e.status == 400 and e.message == 'Requested resource not found':
+                print('freezerbag_names table missing, creating now')
                 print('freezerbag_names table missing, creating now')
                 Table.create('freezerbag_names', schema=[HashKey('filename'), RangeKey('bag_date', data_type=NUMBER)])
                 time.sleep(30)
@@ -355,7 +355,8 @@ class GlacierVault:
             print("Downloading to %s" % (destfile))
             if not os.path.exists(os.path.dirname(destfile)):
                 os.makedirs(os.path.dirname(destfile))
-            ## verify_hashes=False is do to a boto bug in 2.36.0.  We're doing bag validation anyway, so this isn't a deal-breaker
+            ## verify_hashes=False is do to a boto bug in 2.36.0 + python3.x.
+            # We're doing bag validation anyway, so this isn't a deal-breaker, though it hurts efficiency
             ## https://github.com/boto/boto/issues/3059
             job.download_to_file(destfile, verify_hashes=False)
         else:
@@ -399,10 +400,10 @@ if args.freeze:
 
     ## As of version 2.2, the LC Bagger program changed bagging-* to packing-* so we need to check for both
     if 'Bagging-Date' in bag.info:
-        bag_date = int(bag.info['Bagging-Date'].translate(datetranstable))
+        bag_date = int(bag.info['Bagging-Date'].replace('-', ''))
         tagfiles = ['bag-info.txt', 'bagit.txt', 'manifest-md5.txt', 'tagmanifest-md5.txt']
     if 'Packing-Date' in bag.info:
-        bag_date = int(bag.info['Packing-Date'].translate(datetranstable))
+        bag_date = int(bag.info['Packing-Date'].replace('-', ''))
         tagfiles = ['package-info.txt', 'bagit.txt', 'manifest-md5.txt', 'tagmanifest-md5.txt']
 
     ## Create a dictionary for the tagfiles structured just like the bag item dict
@@ -458,12 +459,10 @@ if args.thaw:
     
     ## Restore all versions of the bag.
     for file in files:
-        #print(file['bagname'])
-        #print(file['file_hash'])
         vault_name = file['vault_name']
+        archive_id = file['archive_id']
         filename = file['filename']
         bag_date = file['bag_date']
-        archive_id = file['archive_id']
         GlacierVault(vault_name).retrieve(archive_id, filename, bag_date)
         
     ## Validated the restored bag. Need to store have bagname + bagdates to make this automated.
