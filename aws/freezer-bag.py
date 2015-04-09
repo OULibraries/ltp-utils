@@ -169,22 +169,26 @@ class GlacierVault:
                 'file_hash': file_hash,
                 'filename': rel_filename,
             })
-        ## If the database doesn't exist, create it then add the entry
+        ## If the database doesn't exist, create it
         except JSONResponseError as e:
             if e.status == 400 and e.message == 'Requested resource not found':
                 print('freezerbag_archives table missing, creating now')
                 Table.create('freezerbag_archives', schema=[HashKey('archive_id'), RangeKey('vault_name', data_type='S')])
                 time.sleep(30)
-                hashes.put_item(data={
-                    'file_hash': file_hash,
-                    'archive_id': archive_id,
-                    'vault_name': vault_name,
-                })
             ## Bail if we hit a JSON error we don't understand
             else:
                 print(e.status)
                 print(e.message)
-                exit()        
+                exit()
+        ## Now try to write again, and die if it fails.  This is ugly, and should be done in a try loop or something.        
+        try:
+            hashes.put_item(data={
+                'file_hash': file_hash,
+                'archive_id': archive_id,
+                'vault_name': vault_name,
+            })
+        except:
+            raise
         try:
             names.put_item(data={
                 'filename': rel_filename,
