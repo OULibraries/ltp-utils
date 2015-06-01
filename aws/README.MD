@@ -20,3 +20,10 @@ keepalived.conf goes in
 /etc/keepalived/
 
 Make sure you change ip addresses as appropriate.
+
+
+### other stuff
+
+prompt.sh goes in /etc/profile.d
+
+sets the shell prompt to reflect the aws instance name.  centos kept resetting the hostname to the internal ip. This annoyed me.
