@@ -1,5 +1,10 @@
 ## aws notes
 
+### Keepalived stuff
+Conceptually cribbed from [Brandon Burton's](https://twitter.com/solarce)
+[aws advent post](http://awsadvent.tumblr.com/post/105141640154/aws-advent-2014-high-availability-in-aws-with)
+
+
 
 notify.sh requires aws-cli and goes in
 
