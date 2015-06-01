@@ -1,6 +1,7 @@
 ## aws notes
 
-notify.sh goes in
+
+notify.sh requires aws-cli and goes in
 
 /usr/libexec/keepalived/
 
