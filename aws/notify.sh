@@ -1,7 +1,7 @@
 #!/bin/bash
 
-VIP=your.secondary.internal.ip
-EIP=your.eip
+VIP=SECONDARY.INTERNAL.IP.ADDRESS
+EIP=YOUR.ELASTIC.IP.ADDRESS
 REGION=us-east-1
 
 PATH=/usr/local/bin:/usr/bin:/bin:/sbin:$PATH
