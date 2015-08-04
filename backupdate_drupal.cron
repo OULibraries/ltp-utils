@@ -37,7 +37,7 @@ $SUDO find -L -wholename "./*/drupal/sites/*/settings.php" 2>/dev/null | while r
   $SUDO mkdir -p $SITEBACKUPDIR;
   $SUDO mkdir -p $TEMPDIR;
   $SUDO mkdir -p $TIMEDIR;
-  
+
   ## Set Drupal perms - allows group write
   $SUDO find $SITEPATH -type d -exec chmod u=rwx,g=rwx,o= '{}' \;
   $SUDO find $SITEPATH -type f -exec chmod u=rw,g=rw,o= '{}' \;
@@ -80,8 +80,11 @@ $SUDO find -L -wholename "./*/drupal/sites/*/settings.php" 2>/dev/null | while r
 
   printf "Updating $SITEPATH\n"
   $SUDO cp $SITEPATH/.htaccess /tmp/
+
+  $SUDO drush -y en update -r $SITEPATH
   $SUDO drush rf -r $SITEPATH
   $SUDO drush up -y --security-only -r $SITEPATH
+  $SUDO drush -y dis update -r $SITEPATH
   $SUDO cp /tmp/.htaccess $SITEPATH/
   $SUDO rm /tmp/.htaccess
   printf "\n\n"
